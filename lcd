@@ -1,0 +1,153 @@
+module lcd_controller (
+    input clk,          
+    input rst,          
+    input [3:0] dig_100, 
+    input [3:0] dig_10,  
+    input [3:0] dig_1,  
+
+    output reg lcd_e,
+    output reg lcd_rs,
+    output reg lcd_rw,
+    output reg [7:0] lcd_data
+);
+
+ 
+    reg [31:0] delay_cnt;
+    reg [5:0] state; 
+    reg [7:0] data_to_write;
+    
+  
+    wire [7:0] asc_100 = dig_100 + 8'h30; 
+    wire [7:0] asc_10  = dig_10  + 8'h30;
+    wire [7:0] asc_1   = dig_1   + 8'h30;
+    
+  
+    localparam S_START      = 0;
+    localparam S_WAIT       = 1;
+    localparam S_FUNC_SET   = 2; 
+    localparam S_DISP_ON    = 3; 
+    localparam S_CLEAR      = 4; 
+    localparam S_ENTRY_MODE = 5; 
+    localparam S_INIT_DONE  = 6;
+    
+    localparam S_SET_ADDR1  = 10; 
+    localparam S_WRITE_D    = 11;
+    localparam S_WRITE_A    = 12;
+    localparam S_WRITE_C    = 13;
+    localparam S_WRITE_COL  = 14; 
+    localparam S_WRITE_100  = 15;
+    localparam S_WRITE_10   = 16;
+    localparam S_WRITE_1    = 17;
+    localparam S_WRITE_DONE = 18;
+    localparam S_IDLE       = 19;
+
+    
+    wire lcd_busy = (delay_cnt != 0);
+    always @(posedge clk or negedge rst) begin
+        if (!rst) begin
+            delay_cnt <= 0;
+            state <= S_START;
+            lcd_e <= 0; lcd_rs <= 0; lcd_rw <= 0; lcd_data <= 8'h00;
+        end 
+        else if (lcd_busy) begin
+            delay_cnt <= delay_cnt - 1;
+            lcd_e <= 0;
+        end 
+        else begin 
+            case (state)
+                S_START: begin
+                    delay_cnt <= 1_000_000; 
+                    state <= S_WAIT;
+                end
+                S_WAIT: begin
+                    delay_cnt <= 200_000; 
+                    state <= S_FUNC_SET;
+                end
+                
+                
+                S_FUNC_SET:   begin 
+                    lcd_rs <= 0; lcd_rw <= 0; lcd_data <= 8'h38;
+                    lcd_e <= 1; delay_cnt <= 5000; 
+                    state <= S_DISP_ON;
+                end
+                S_DISP_ON:    begin 
+                    lcd_rs <= 0; lcd_rw <= 0; lcd_data <= 8'h0C;
+                    lcd_e <= 1; delay_cnt <= 5000; 
+                    state <= S_CLEAR;
+                end
+                S_CLEAR:      begin 
+                    lcd_rs <= 0; lcd_rw <= 0; lcd_data <= 8'h01;
+                    lcd_e <= 1; delay_cnt <= 100_000; 
+                    state <= S_ENTRY_MODE;
+                end
+                S_ENTRY_MODE: begin 
+                    lcd_rs <= 0; lcd_rw <= 0; lcd_data <= 8'h06;
+                    lcd_e <= 1; delay_cnt <= 5000; 
+                    state <= S_INIT_DONE;
+                end
+                S_INIT_DONE: begin
+                    state <= S_SET_ADDR1; 
+                end
+
+                
+                S_SET_ADDR1: begin 
+                    lcd_rs <= 0; lcd_rw <= 0; lcd_data <= 8'h80;
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_D;
+                end
+               
+                S_WRITE_D:   begin 
+                    lcd_rs <= 1; lcd_rw <= 0; lcd_data <= "D";
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_A;
+                end
+                S_WRITE_A:   begin
+                    lcd_rs <= 1; lcd_rw <= 0; lcd_data <= "A";
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_C;
+                end
+                S_WRITE_C:   begin
+                    lcd_rs <= 1; lcd_rw <= 0; lcd_data <= "C";
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_COL;
+                end
+                S_WRITE_COL: begin
+                    lcd_rs <= 1; lcd_rw <= 0; lcd_data <= ":";
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_100;
+                end
+                
+                S_WRITE_100: begin
+                    lcd_rs <= 1; lcd_rw <= 0;
+                    if (dig_100 == 0) lcd_data <= " ";
+                    else lcd_data <= asc_100;
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_10;
+                end
+                
+                S_WRITE_10:  begin
+                    lcd_rs <= 1; lcd_rw <= 0;
+                    if (dig_100 == 0 && dig_10 == 0) lcd_data <= " ";
+                    else lcd_data <= asc_10;
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_1;
+                end
+                S_WRITE_1:   begin 
+                    lcd_rs <= 1; lcd_rw <= 0; lcd_data <= asc_1;
+                    lcd_e <= 1; delay_cnt <= 5000;
+                    state <= S_WRITE_DONE;
+                end
+                S_WRITE_DONE: begin
+                    state <= S_IDLE;
+                end
+                S_IDLE: begin 
+                    delay_cnt <= 500_000; 
+                    state <= S_SET_ADDR1; 
+                end
+                
+                default: state <= S_START;
+            endcase
+        end
+    end
+
+endmodule
