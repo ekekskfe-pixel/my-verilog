@@ -1,0 +1,64 @@
+module DAC_E (
+    input clk,          
+    input rst,         
+    input [9:0] btn,    
+    input add_sel,     
+
+    // DAC 모듈 
+    output dac_csn,
+    output dac_ldacn,
+    output dac_wrn,
+    output dac_a_b,
+    output [7:0] dac_d,
+
+    // 7-Segment 
+    output [3:0] fnd_sel,  
+    output [6:0] fnd_data, 
+
+    // Text-LCD 
+    output lcd_e,
+    output lcd_rs,
+    output lcd_rw,
+    output [7:0] lcd_data
+);
+
+   
+    wire [7:0] dac_value;
+    
+    
+    wire [3:0] dig_100; 
+    wire [3:0] dig_10;  
+    wire [3:0] dig_1;   
+    
+ 
+    assign dig_100 = dac_value / 100;
+    assign dig_10  = (dac_value % 100) / 10;
+    assign dig_1   = dac_value % 10;
+
+
+   
+    DAC u_dac (
+        .clk(clk),
+        .rst(rst),
+        .btn(btn),
+        .add_sel(add_sel),
+        .dac_csn(dac_csn),
+        .dac_ldacn(dac_ldacn),
+        .dac_wrn(dac_wrn),
+        .dac_a_b(dac_a_b),
+        .dac_d(dac_d),
+        .led_out(dac_value) 
+    );
+
+   
+    segment7 u_fnd (
+        .clk(clk),
+        .rst(rst),
+        .dig_100(dig_100),
+        .dig_10(dig_10),
+        .dig_1(dig_1),
+        .fnd_sel(fnd_sel),
+        .fnd_data(fnd_data)
+    );
+    
+    
